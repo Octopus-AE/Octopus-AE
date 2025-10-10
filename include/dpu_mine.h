@@ -12,8 +12,8 @@ __mram_noinit node_t e2v[E2V_CAPACITY];    // 28M
 __host edge_t e_cnt;
 __host edge_t e2v_size;
 __mram_noinit edge_t deg2e[MAX_EDGE_SIZE][2];
-__mram_noinit edge_t adj_idx[IDX_CAPACITY]; // 每条超边邻接表的起始位置
-__mram_noinit AdjPair adj_e2e[ADJ_CAPACITY]; // 全局邻接池
+__mram_noinit edge_t adj_idx[IDX_CAPACITY]; // 
+__mram_noinit AdjPair adj_e2e[ADJ_CAPACITY]; //
 __host edge_t adj_size;        
 
 
