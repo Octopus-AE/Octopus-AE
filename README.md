@@ -1,4 +1,4 @@
-# Octopus: Efficient Hypergraph Pattern Mining with Practical PIM Architecture
+# Octopus: Efficient Hypergraph Pattern Mining with Practical Processing-in-Memory Architecture
 ## Project Overview
 
-Octopus is an efficient hypergraph pattern mining framework with Practical PIM Architecture.
+Octopus is an efficient hypergraph pattern mining framework with Practical Processing-in-Memory Architecture.
