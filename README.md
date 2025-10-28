@@ -40,3 +40,19 @@ Octopus-AE/
 ## ⚙️ Build and Run Instructions
 
 To run HPM on a hypergraph, use:
+
+```bash
+make clean
+GRAPH=<hypergraph_name> PATTERN=<pattern_name> make test
+```
+
+Example:
+
+```bash
+GRAPH=senate PATTERN=CLIQUE3 make test
+```
+
+> 💡 The available values for `GRAPH` and `PATTERN` are defined in `include/common.h`.  
+> To add new graphs or patterns, modify `common.h` and recompile.
+
+---
