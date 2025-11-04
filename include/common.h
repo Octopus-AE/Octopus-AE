@@ -90,10 +90,10 @@ typedef struct {
     edge_t  e_cnt;              
     edge_t  e2v_size;           
 
-    //度数索引
+
     edge_t  deg2e[MAX_EDGE_SIZE][2];
 
-    //邻接表
+
     bit_t bitmap[BITMAP_ROW][BITMAP_COL]; // size < 24M
 
     uint64_t root_num[NR_DPUS];  // number of search roots allocated to dpu
