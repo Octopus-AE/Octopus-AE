@@ -53,6 +53,6 @@ GRAPH=senate PATTERN=CLIQUE3 make test
 ```
 
 > 💡 The available values for `GRAPH` and `PATTERN` are defined in `include/common.h`.  
-> To add new graphs or patterns, modify `common.h` and recompile.
+> To add new hypergraphs or patterns, modify `common.h` and recompile.
 
 ---
