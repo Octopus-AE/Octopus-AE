@@ -6,8 +6,17 @@
 
 
 #define DATA_DIR "./data/"
+#if defined(SB)
 #define DATA_NAME "senate"
-// #define DATA_NAME "school"
+#elif defined(CP)
+#define DATA_NAME "primary_school"
+#elif defined(TC)
+#define DATA_NAME "trivago"
+#else
+#warning "No graph selected, fall back to SB."
+#define DATA_NAME "senate"
+#endif
+
 #define DATA_PATH DATA_DIR DATA_NAME ".txt"
 
 #ifndef NR_DPUS
@@ -23,17 +32,39 @@
 #define DPU_BINARY "bin/dpu" 
 #endif
 
-#if defined(CLIQUE3)
-#define KERNEL_FUNC clique3
-#define PATTERN_NAME "clique3"
+#if defined(HYP3_7_12)
+#define KERNEL_FUNC hyp3_7_12
+#define PATTERN_NAME "hyp3_7_12"
+#elif defined(HYP3_4_5)
+#define KERNEL_FUNC hyp3_4_5
+#define PATTERN_NAME "hyp3_4_5"
+#elif defined(HYP2_3_7_13)
+#define KERNEL_FUNC hyp2_3_7_13
+#define PATTERN_NAME "hyp2_3_7_13"
+#elif defined(HYP2_3_4_6)
+#define KERNEL_FUNC hyp2_3_4_6
+#define PATTERN_NAME "hyp2_3_4_6"
+#elif defined(HYP2_3_4_5_24)
+#define KERNEL_FUNC hyp2_3_4_5_24
+#define PATTERN_NAME "hyp2_3_4_5_24"
+#else
+#warning "No kernel function selected, fall back to HYP3_7_12."
+#define KERNEL_FUNC hyp3_7_12
+#define PATTERN_NAME "hyp3_7_12"
 #endif
 
 
-#define IDX_CAPACITY   (1024 * 1024)   // 
-#define E2V_CAPACITY   (7 * 1024 * 1024)  // 
+
+#define IDX_CAPACITY   (1024 * 1024)   //  超边数上限
+#define E2V_CAPACITY   (7 * 1024 * 1024)  // 节点存储上限
 #define ADJ_CAPACITY  (2 * 1024 * 1024)
-#define MAX_EDGE_SIZE  256                // 
-#define MAX_EDGES      (1024 * 1024)      //
+#define MAX_EDGE_SIZE  256                // 单条超边最大节点数
+#define MAX_EDGES      (1024 * 1024)      // 测试用最大超边数
+
+
+#define bit_t uint64_t
+#define BITMAP_ROW (14144) 
+#define BITMAP_COL (BITMAP_ROW /64)
 
 #define node_t uint32_t
 #define edge_t uint32_t
@@ -41,7 +72,7 @@
 #define SIZE_NODE_T_LOG 2
 #define SIZE_EDGE_PTR_LOG 2
 #define INVALID_NODE ((node_t)(-1))
-#define DPU_ROOT_NUM ((1<<20)/sizeof(node_t))
+#define DPU_ROOT_NUM ((1<<18)/sizeof(node_t))
 #define BUF_SIZE 32
 #define MRAM_BUF_SIZE 1024
 
@@ -49,23 +80,21 @@
 
 
 typedef struct {
-    edge_t e;     
-    edge_t cnt;   
-} AdjPair;        
+    edge_t e;     // 相交的超边编号
+    edge_t cnt;   // 交点数量
+} AdjPair;        // 固定 8 字节
 
 typedef struct {
-    edge_t  e2v_idx[IDX_CAPACITY];  
-    node_t  e2v[E2V_CAPACITY];  
-    edge_t  e_cnt;              
-    edge_t  e2v_size;           
+    edge_t  e2v_idx[IDX_CAPACITY];  // 超边起始位置
+    node_t  e2v[E2V_CAPACITY];  // 节点数组
+    edge_t  e_cnt;              // 超边数
+    edge_t  e2v_size;           // e2v 已用大小
 
-
+    //度数索引
     edge_t  deg2e[MAX_EDGE_SIZE][2];
 
-
-    edge_t   adj_idx[IDX_CAPACITY]; // 
-    AdjPair  adj_e2e[ADJ_CAPACITY]; // 
-    edge_t   adj_size;              //
+    //邻接表
+    bit_t bitmap[BITMAP_ROW][BITMAP_COL]; //邻接表位图 size < 24M
 
     uint64_t root_num[NR_DPUS];  // number of search roots allocated to dpu
     node_t *roots[NR_DPUS];

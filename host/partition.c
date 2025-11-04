@@ -24,7 +24,6 @@ static int cmp_node(const void *a, const void *b) {
     return (na > nb) - (na < nb);
 }
 
-
 static int cmp_edge_tmp(const void *a, const void *b) {
     const EdgeTmp *ea = (const EdgeTmp*)a;
     const EdgeTmp *eb = (const EdgeTmp*)b;
@@ -37,7 +36,7 @@ static int cmp_edge_tmp(const void *a, const void *b) {
 }
 
 
-int load_hypergraph(Hypergraph *hg) {
+int load_hypergraph(Hypergraph *hg) { 
     FILE *fp = fopen(DATA_PATH, "rb");
     if (!fp) { perror("fopen"); return -1; }
 
@@ -65,7 +64,7 @@ int load_hypergraph(Hypergraph *hg) {
         }
         if (n_cnt == 0) continue;
 
-
+ 
         qsort(buf, n_cnt, sizeof(node_t), cmp_node);
         edge_t unique_cnt = 0;
         for (edge_t i = 0; i < n_cnt; i++)
@@ -115,47 +114,53 @@ int load_hypergraph(Hypergraph *hg) {
             if (last_deg > 0) {
                 hg->deg2e[last_deg][1] = i;  
             }
-            hg->deg2e[deg][0] = i;          
+            hg->deg2e[deg][0] = i;         
             last_deg = deg;
         }
     }
-    printf("WARNING: adj pool full (%u)\n", hg->e2v_size);
 
     hg->deg2e[last_deg][1] = e_cnt;
+    printf("Hypergraph loaded: %u edges, %u nodes in e2v\n", e_cnt, hg->e2v_size);
+    
+
+    if (e_cnt > BITMAP_ROW) {
+        printf(ANSI_COLOR_RED "Skip bitmap init: edge count %u > max row %u\n" ANSI_COLOR_RESET,
+               e_cnt, BITMAP_ROW);
+        return 0;
+    }
+
+    printf("Initializing adjacency bitmap (%u × %u)...\n", e_cnt, e_cnt);
+    memset(hg->bitmap, 0, sizeof(hg->bitmap));
 
 
-    // hg->adj_size = 0;
-    // for (edge_t e = 0; e < hg->e_cnt; e++) {
-    //     hg->adj_idx[e] = hg->adj_size;
-    //     for (edge_t f = e + 1; f < hg->e_cnt; f++) {
-    //         
-    //         edge_t i = hg->e2v_idx[e], i_end = hg->e2v_idx[e+1];
-    //         edge_t j = hg->e2v_idx[f], j_end = hg->e2v_idx[f+1];
-    //         edge_t cnt = 0;
-    //         while (i < i_end && j < j_end) {
-    //             if (hg->e2v[i] == hg->e2v[j]) { cnt++; i++; j++; }
-    //             else if (hg->e2v[i] < hg->e2v[j]) i++;
-    //             else j++;
-    //         }
-    //         if (cnt > 0) {
-    //             if (hg->adj_size + 2 > ADJ_CAPACITY) {
-    //                 printf("WARNING: adj pool full (%u)\n", hg->adj_size);
-    //                 return;
-    //             }
-    //            
-    //             hg->adj_e2e[hg->adj_size].e   = f;
-    //             hg->adj_e2e[hg->adj_size].cnt = cnt;
-    //             hg->adj_size++;
+    for (edge_t i = 0; i < e_cnt; i++) {
+        edge_t start_i = hg->e2v_idx[i];
+        edge_t end_i   = hg->e2v_idx[i+1];
 
-    //            
-    //             hg->adj_e2e[hg->adj_size].e   = e;
-    //             hg->adj_e2e[hg->adj_size].cnt = cnt;
-    //             hg->adj_size++;
-    //         }
-    //     }
-    // }
-    // hg->adj_idx[hg->e_cnt] = hg->adj_size;
+        for (edge_t j = i + 1; j < e_cnt; j++) {
+            edge_t start_j = hg->e2v_idx[j];
+            edge_t end_j   = hg->e2v_idx[j+1];
 
+
+            node_t *a = &hg->e2v[start_i];
+            node_t *b = &hg->e2v[start_j];
+            edge_t ia = 0, ib = 0;
+            int intersect = 0;
+
+            while (ia < end_i - start_i && ib < end_j - start_j) {
+                if (a[ia] == b[ib]) { intersect = 1; break; }
+                if (a[ia] < b[ib]) ia++; else ib++;
+            }
+
+            if (intersect) {
+                hg->bitmap[i][j / (sizeof(bit_t)*8)] |= ((bit_t)1 << (j % (sizeof(bit_t)*8)));
+                hg->bitmap[j][i / (sizeof(bit_t)*8)] |= ((bit_t)1 << (i % (sizeof(bit_t)*8)));
+            }
+        }
+    }
+
+    printf(ANSI_COLOR_GREEN "Adjacency bitmap initialized.\n" ANSI_COLOR_RESET);
+    
     return 0;
 }
 
@@ -221,17 +226,12 @@ void alloc_tasks(Hypergraph *hg) {
         hg->roots[d] = (node_t*)malloc(sizeof(node_t) * DPU_ROOT_NUM);
     }
 
-    // round-robin
+
     for (edge_t e = start; e < end; e++) {
         unsigned dpu = (e - start) % NR_DPUS;
         hg->roots[dpu][hg->root_num[dpu]++] = (node_t)e;  
     }
 
-    // 
-    // for (unsigned d = 0; d < NR_DPUS; d++) {
-    //     printf("DPU %u: root_num = %llu\n", d,
-    //            (unsigned long long)hg->root_num[d]);
-    // }
 }
 
 edge_t test_pattern_count_buf(Hypergraph* hg, edge_t buf_size) {
@@ -261,7 +261,7 @@ edge_t test_pattern_count_buf(Hypergraph* hg, edge_t buf_size) {
                 if (inter712 != 1) continue;
                 node_t inter_node_712 = buffer[0];
 
-
+ 
                 if (inter_node_312 == inter_node_712) continue;
 
 
@@ -291,11 +291,11 @@ edge_t test_pattern_count_buf_print(Hypergraph* hg, edge_t buf_size) {
     int sample_num = 0;
 
 
-    edge_t start3 = hg->deg2e[3][0], end3 = hg->deg2e[3][1];
+    edge_t start3 = hg->deg2e[5][0], end3 = hg->deg2e[5][1];
 
-    edge_t start7 = hg->deg2e[7][0], end7 = hg->deg2e[7][1];
+    edge_t start7 = hg->deg2e[4][0], end7 = hg->deg2e[4][1];
 
-    edge_t start12 = hg->deg2e[12][0], end12 = hg->deg2e[12][1];
+    edge_t start12 = hg->deg2e[3][0], end12 = hg->deg2e[3][1];
 
     for (edge_t e3 = start3; e3 < end3; e3++) {
         for (edge_t e7 = start7; e7 < end7; e7++) {
@@ -309,17 +309,16 @@ edge_t test_pattern_count_buf_print(Hypergraph* hg, edge_t buf_size) {
                 if (inter312 != 1) continue;
                 node_t inter_node_312 = buffer[0];
 
-
+   
                 edge_t inter712 = test_hyperedge_intersection(hg, e7, e12, buffer, buf_size);
                 if (inter712 != 1) continue;
                 node_t inter_node_712 = buffer[0];
 
-
+  
                 if (inter_node_312 == inter_node_712) continue;
 
-
+  
                 count++;
-
 
                 if (sample_num < 3) {
                     samples[sample_num].e3 = e3;
@@ -363,12 +362,12 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
 {
     //read data
     load_hypergraph(hg);
-    //print_hypergraph(hg, 10);  
-    test_deg2e(hg, 3);           
+    //print_hypergraph(hg, 10);   
+    //test_deg2e(hg, 5);           
 
-    edge_t total = test_pattern_count_buf_print(hg, 256);
-    printf("Total matches of the pattern (BUF_SIZE=%u): %u\n", 256, total);
-    // node_t common_nodes[256]; 
+    // edge_t total = test_pattern_count_buf_print(hg, 256);
+    // printf("Total matches of the pattern (BUF_SIZE=%u): %u\n", 256, total);
+    // node_t common_nodes[256];  
     // edge_t cnt = test_hyperedge_intersection(hg, 0, 1, common_nodes, 256);
     // printf("Intersection size = %u\n", cnt);
     // for (edge_t i = 0; i < cnt; i++)
@@ -381,11 +380,10 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
     //transfer data
     {
 
-    size_t size_e2v_idx = (size_t)(hg->e_cnt + 1) * sizeof(edge_t);   
-    size_t size_e2v     = (size_t)(hg->e2v_size) * sizeof(node_t);     
-    size_t size_adj_idx = (size_t)(hg->e_cnt + 1) * sizeof(edge_t);   
-    size_t size_adj_e2e = (size_t)(hg->adj_size) * sizeof(AdjPair);    
-    size_t size_deg2e   = (size_t)MAX_EDGE_SIZE * 2 * sizeof(edge_t);  
+    size_t size_e2v_idx = (size_t)(hg->e_cnt + 1) * sizeof(edge_t);     
+    size_t size_e2v     = (size_t)(hg->e2v_size) * sizeof(node_t);      
+    size_t size_adj_idx = (size_t)(hg->e_cnt + 1) * sizeof(edge_t);     
+    size_t size_deg2e   = (size_t)MAX_EDGE_SIZE * 2 * sizeof(edge_t);   
 
     struct dpu_set_t dpu;
     uint32_t each_dpu;
@@ -422,17 +420,19 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
     }
     DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "deg2e", 0, ALIGN8(size_deg2e), DPU_XFER_DEFAULT));
 
-    // DPU_FOREACH(set, dpu, each_dpu) {
-    //     DPU_ASSERT(dpu_prepare_xfer(dpu, hg->adj_idx));
-    // }
-    // DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "adj_idx", 0, ALIGN8(size_adj_idx), DPU_XFER_DEFAULT));
 
-    // if (hg->adj_size > 0) {
-    //     DPU_FOREACH(set, dpu, each_dpu) {
-    //         DPU_ASSERT(dpu_prepare_xfer(dpu, hg->adj_e2e));
-    //     }
-    //     DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "adj_e2e", 0, ALIGN8(size_adj_e2e), DPU_XFER_DEFAULT));
-    // }
+
+    if (hg->e_cnt <= BITMAP_ROW) {
+        size_t size_bitmap_bytes = 0;
+        size_t bitmap_words = (size_t)BITMAP_COL * (size_t)hg->e_cnt;
+        size_bitmap_bytes = bitmap_words * sizeof(bit_t);
+
+        DPU_FOREACH(set, dpu, each_dpu) {
+            DPU_ASSERT(dpu_prepare_xfer(dpu, &hg->bitmap[0][0]));
+        }
+        DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "bitmap", 0, ALIGN8(size_bitmap_bytes), DPU_XFER_DEFAULT));
+
+    }
 
     DPU_FOREACH(set, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &hg->e_cnt));
@@ -444,12 +444,7 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
     }
     DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "e2v_size", 0, sizeof(edge_t), DPU_XFER_DEFAULT));
 
-    // DPU_FOREACH(set, dpu, each_dpu) {
-    //     DPU_ASSERT(dpu_prepare_xfer(dpu, &hg->adj_size));
-    // }
-    // DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "adj_size", 0, sizeof(edge_t), DPU_XFER_DEFAULT));
-
-    printf("Data transfer complete: e_cnt=%u e2v_size=%u adj_size=%u max_root_num=%u\n",
-           (unsigned)hg->e_cnt, (unsigned)hg->e2v_size, (unsigned)hg->adj_size, (unsigned)max_root_num);
+    printf("Data transfer complete: e_cnt=%u e2v_size=%u max_root_num=%u\n",
+           (unsigned)hg->e_cnt, (unsigned)hg->e2v_size, (unsigned)max_root_num);
     }
 }

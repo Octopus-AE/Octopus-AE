@@ -15,10 +15,7 @@ int main() {
 	sysname_t tasklet_id = me();
 	if (tasklet_id == 0) {
 		mem_reset();
-
-// #ifdef PERF
 		perfcounter_config(COUNT_CYCLES, true);
-// #endif
 	}
 	barrier_wait(&my_barrier);
 
