@@ -49,7 +49,7 @@ GRAPH=<hypergraph_name> PATTERN=<pattern_name> make test
 Example:
 
 ```bash
-GRAPH=senate PATTERN=hyp2_3_4_6 make test
+GRAPH=SB PATTERN=HYP2_3_4_6 make test
 ```
 
 > 💡 The available values for `GRAPH` and `PATTERN` are defined in `include/common.h`.  
