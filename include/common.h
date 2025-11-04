@@ -55,11 +55,11 @@
 
 
 
-#define IDX_CAPACITY   (1024 * 1024)   //  超边数上限
-#define E2V_CAPACITY   (7 * 1024 * 1024)  // 节点存储上限
+#define IDX_CAPACITY   (1024 * 1024)  
+#define E2V_CAPACITY   (7 * 1024 * 1024)  
 #define ADJ_CAPACITY  (2 * 1024 * 1024)
-#define MAX_EDGE_SIZE  256                // 单条超边最大节点数
-#define MAX_EDGES      (1024 * 1024)      // 测试用最大超边数
+#define MAX_EDGE_SIZE  256                
+#define MAX_EDGES      (1024 * 1024)      
 
 
 #define bit_t uint64_t
@@ -80,21 +80,21 @@
 
 
 typedef struct {
-    edge_t e;     // 相交的超边编号
-    edge_t cnt;   // 交点数量
-} AdjPair;        // 固定 8 字节
+    edge_t e;     
+    edge_t cnt;   
+} AdjPair;       
 
 typedef struct {
-    edge_t  e2v_idx[IDX_CAPACITY];  // 超边起始位置
-    node_t  e2v[E2V_CAPACITY];  // 节点数组
-    edge_t  e_cnt;              // 超边数
-    edge_t  e2v_size;           // e2v 已用大小
+    edge_t  e2v_idx[IDX_CAPACITY]; 
+    node_t  e2v[E2V_CAPACITY];  
+    edge_t  e_cnt;              
+    edge_t  e2v_size;           
 
     //度数索引
     edge_t  deg2e[MAX_EDGE_SIZE][2];
 
     //邻接表
-    bit_t bitmap[BITMAP_ROW][BITMAP_COL]; //邻接表位图 size < 24M
+    bit_t bitmap[BITMAP_ROW][BITMAP_COL]; // size < 24M
 
     uint64_t root_num[NR_DPUS];  // number of search roots allocated to dpu
     node_t *roots[NR_DPUS];
