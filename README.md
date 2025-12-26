@@ -55,4 +55,11 @@ GRAPH=SB PATTERN=HYP2_3_4_6 make test
 > 💡 The available values for `GRAPH` and `PATTERN` are defined in `include/common.h`.  
 > To add new hypergraphs or patterns, modify `common.h` and recompile.
 
+## 📥 Download Hypergraph Data
+
+```bash
+pip install -r requirements.txt
+python data/download.py
+```
+
 ---
