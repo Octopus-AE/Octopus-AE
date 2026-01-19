@@ -1,0 +1,19 @@
+//SB  
+TIME(s)  0.023
+SIZE(MB) 0.95
+(e_cnt=21721 e2v_size=215141)
+
+//HB
+TIME(s)  0.089
+SIZE(MB) 5.09
+(e_cnt=55213 e2v_size=1216600)
+
+//WT
+TIME(s)  0.038
+SIZE(MB) 2.07
+(e_cnt=65979 e2v_size=452440)
+
+//TC
+TIME(s)  0.067
+SIZE(MB) 3.69
+(e_cnt=220971 e2v_size=701952)

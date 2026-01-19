@@ -12,6 +12,13 @@
 #define DATA_NAME "primary_school"
 #elif defined(TC)
 #define DATA_NAME "trivago"
+#elif defined(WT)
+#define DATA_NAME "wt"
+#elif defined(HB)
+#define DATA_NAME "hb"
+#elif defined(HS)
+#define DATA_NAME "high_school"
+
 #else
 #warning "No graph selected, fall back to SB."
 #define DATA_NAME "senate"
@@ -55,11 +62,11 @@
 
 
 
-#define IDX_CAPACITY   (1024 * 1024)  
-#define E2V_CAPACITY   (7 * 1024 * 1024)  
+#define IDX_CAPACITY   (1024 * 1024)   
+#define E2V_CAPACITY   (7 * 1024 * 1024) 
 #define ADJ_CAPACITY  (2 * 1024 * 1024)
-#define MAX_EDGE_SIZE  256                
-#define MAX_EDGES      (1024 * 1024)      
+#define MAX_EDGE_SIZE  32                
+#define MAX_EDGES      (1024 * 1024)    
 
 
 #define bit_t uint64_t
@@ -76,25 +83,32 @@
 #define BUF_SIZE 32
 #define MRAM_BUF_SIZE 1024
 
+//#define H2H
+#define H2H_CAPACITY   (6 * 1024 * 1024)
 // #define BRANCH_LEVEL_THRESHOLD 16
 
 
 typedef struct {
-    edge_t e;     
-    edge_t cnt;   
-} AdjPair;       
+    edge_t e;     // 
+    edge_t cnt;   // 
+} AdjPair;        // 
 
 typedef struct {
-    edge_t  e2v_idx[IDX_CAPACITY]; 
-    node_t  e2v[E2V_CAPACITY];  
-    edge_t  e_cnt;              
-    edge_t  e2v_size;           
+    edge_t  e2v_idx[IDX_CAPACITY];  // 
+    node_t  e2v[E2V_CAPACITY];  // 
+    edge_t  e_cnt;              // 
+    edge_t  e2v_size;           // e2v 
 
 
     edge_t  deg2e[MAX_EDGE_SIZE][2];
 
+    //
+    edge_t  h2h_offset[IDX_CAPACITY]; // CSR 
+    edge_t  h2h_buffer[H2H_CAPACITY]; //  size < 24M
+    edge_t  h2h_total_size;           // buffer 
 
-    bit_t bitmap[BITMAP_ROW][BITMAP_COL]; // size < 24M
+    //
+    bit_t bitmap[BITMAP_ROW][BITMAP_COL]; 
 
     uint64_t root_num[NR_DPUS];  // number of search roots allocated to dpu
     node_t *roots[NR_DPUS];

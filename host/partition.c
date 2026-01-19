@@ -36,6 +36,101 @@ static int cmp_edge_tmp(const void *a, const void *b) {
 }
 
 
+
+void build_h2h_index(Hypergraph *hg) {
+    printf("Building H2H index (Indexed by Neighbor Degree, Fixed Header)...\n");
+    
+    hg->h2h_total_size = 0;
+    
+
+    edge_t *temp_buckets[MAX_EDGE_SIZE + 1]; 
+    edge_t bucket_counts[MAX_EDGE_SIZE + 1];
+    
+
+    edge_t max_neighbors = hg->e_cnt; 
+    for(int i=0; i <= MAX_EDGE_SIZE; i++) {
+        temp_buckets[i] = (edge_t*)malloc(max_neighbors * sizeof(edge_t));
+    }
+
+    for (edge_t i = 0; i < hg->e_cnt; i++) {
+
+        memset(bucket_counts, 0, sizeof(bucket_counts));
+
+     
+        edge_t start_i = hg->e2v_idx[i];
+        edge_t end_i   = hg->e2v_idx[i+1];
+        
+       
+        for (edge_t j = 0; j < hg->e_cnt; j++) {
+            if (i == j) continue;
+
+
+            bool is_intersect = false;
+            edge_t start_j = hg->e2v_idx[j];
+            edge_t end_j   = hg->e2v_idx[j+1];
+            
+           
+            edge_t ia = start_i, ib = start_j;
+            while (ia < end_i && ib < end_j) {
+                if (hg->e2v[ia] == hg->e2v[ib]) { is_intersect = true; break; }
+                else if (hg->e2v[ia] < hg->e2v[ib]) ia++;
+                else ib++;
+            }
+
+            if (is_intersect) {
+                
+                edge_t deg_j = end_j - start_j;
+
+               
+                if (deg_j > 0 && deg_j <= MAX_EDGE_SIZE) {
+                    temp_buckets[deg_j][bucket_counts[deg_j]++] = j;
+                }
+            }
+        }
+
+ 
+        edge_t header_size = MAX_EDGE_SIZE + 1; 
+        edge_t data_size = 0;
+        for(int d=1; d <= MAX_EDGE_SIZE; d++) data_size += bucket_counts[d];
+
+      
+        if (hg->h2h_total_size + header_size + data_size >= H2H_CAPACITY) {
+            fprintf(stderr, ANSI_COLOR_RED "Error: H2H buffer overflow at edge %u! (Current: %u, Cap: %u)\n" ANSI_COLOR_RESET, 
+                    i, hg->h2h_total_size + header_size + data_size, H2H_CAPACITY);
+            fprintf(stderr, ANSI_COLOR_RED "H2H optimization cannot be enabled with current capacity. Please Disable H2H\n" ANSI_COLOR_RESET);
+            exit(1); 
+        }
+
+        
+        hg->h2h_offset[i] = hg->h2h_total_size;
+        edge_t *block_base = &hg->h2h_buffer[hg->h2h_total_size];
+
+
+        edge_t current_relative_pos = header_size;
+        for (int d = 1; d <= MAX_EDGE_SIZE; d++) {
+            block_base[d-1] = current_relative_pos; 
+            current_relative_pos += bucket_counts[d];
+        }
+        block_base[MAX_EDGE_SIZE] = current_relative_pos; 
+
+        for (int d = 1; d <= MAX_EDGE_SIZE; d++) {
+            edge_t count = bucket_counts[d];
+            if (count > 0) {
+                edge_t start_pos = block_base[d-1];
+                memcpy(&block_base[start_pos], temp_buckets[d], count * sizeof(edge_t));
+            }
+        }
+
+        hg->h2h_total_size += (header_size + data_size);
+    }
+
+    
+    for(int i=0; i <= MAX_EDGE_SIZE; i++) free(temp_buckets[i]);
+    
+    printf("H2H Index built (By Degree). Total size: %u\n", hg->h2h_total_size);
+}
+
+
 int load_hypergraph(Hypergraph *hg) { 
     FILE *fp = fopen(DATA_PATH, "rb");
     if (!fp) { perror("fopen"); return -1; }
@@ -121,7 +216,10 @@ int load_hypergraph(Hypergraph *hg) {
 
     hg->deg2e[last_deg][1] = e_cnt;
     printf("Hypergraph loaded: %u edges, %u nodes in e2v\n", e_cnt, hg->e2v_size);
-    
+
+#if defined(H2H)
+    build_h2h_index(hg);
+#endif
 
     if (e_cnt > BITMAP_ROW) {
         printf(ANSI_COLOR_RED "Skip bitmap init: edge count %u > max row %u\n" ANSI_COLOR_RESET,
@@ -161,6 +259,8 @@ int load_hypergraph(Hypergraph *hg) {
 
     printf(ANSI_COLOR_GREEN "Adjacency bitmap initialized.\n" ANSI_COLOR_RESET);
     
+
+
     return 0;
 }
 
@@ -361,6 +461,12 @@ edge_t test_pattern_count_buf_print(Hypergraph* hg, edge_t buf_size) {
 void data_transfer(struct dpu_set_t set, Hypergraph *hg)
 {
     //read data
+
+    clock_t start, end;
+    double cpu_time_used;
+
+    start = clock(); 
+    
     load_hypergraph(hg);
     //print_hypergraph(hg, 10);   
     //test_deg2e(hg, 5);           
@@ -377,6 +483,10 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
     //alloc task
     alloc_tasks(hg);
 
+
+
+
+
     //transfer data
     {
 
@@ -385,6 +495,11 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
     size_t size_adj_idx = (size_t)(hg->e_cnt + 1) * sizeof(edge_t);     
     size_t size_deg2e   = (size_t)MAX_EDGE_SIZE * 2 * sizeof(edge_t);   
 
+    
+    size_t total = size_e2v_idx + size_e2v;
+
+    double total_MB  = (double)total / 1000.0 / 1000.0;
+    printf(" TOTAL   = %.3f MB\n", total_MB);
     struct dpu_set_t dpu;
     uint32_t each_dpu;
     node_t max_root_num = 0;
@@ -421,7 +536,40 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
     DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "deg2e", 0, ALIGN8(size_deg2e), DPU_XFER_DEFAULT));
 
 
+#if defined(H2H)
 
+    if (hg->h2h_total_size >= H2H_CAPACITY) {
+        printf(ANSI_COLOR_RED "ERROR: Host H2H buffer overflow detected during build! (Size >= %u)\n", H2H_CAPACITY);
+        printf("Transmission Aborted: Data is incomplete.\n" ANSI_COLOR_RESET);
+        return; 
+    }
+
+   
+    size_t size_h2h_offset = (size_t)(hg->e_cnt + 1) * sizeof(edge_t);
+    size_t size_h2h_buffer = (size_t)(hg->h2h_total_size) * sizeof(edge_t);
+
+    printf("H2H Index Size: %.2f MB (Offset) + %.2f MB (Buffer). Transferring...\n",
+           (double)size_h2h_offset/1024.0/1024.0, 
+           (double)size_h2h_buffer/1024.0/1024.0);
+
+    // 3. 执行传输
+    DPU_FOREACH(set, dpu, each_dpu) { 
+        DPU_ASSERT(dpu_prepare_xfer(dpu, hg->h2h_offset)); 
+    }
+    DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "h2h_offset", 0, ALIGN8(size_h2h_offset), DPU_XFER_DEFAULT));
+
+    DPU_FOREACH(set, dpu, each_dpu) { 
+        DPU_ASSERT(dpu_prepare_xfer(dpu, hg->h2h_buffer)); 
+    }
+    DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "h2h_buffer", 0, ALIGN8(size_h2h_buffer), DPU_XFER_DEFAULT));
+
+    DPU_FOREACH(set, dpu, each_dpu) { 
+        DPU_ASSERT(dpu_prepare_xfer(dpu, &hg->h2h_total_size)); 
+    }
+    DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "h2h_total_size", 0, sizeof(edge_t), DPU_XFER_DEFAULT));
+
+#else
+   
     if (hg->e_cnt <= BITMAP_ROW) {
         size_t size_bitmap_bytes = 0;
         size_t bitmap_words = (size_t)BITMAP_COL * (size_t)hg->e_cnt;
@@ -431,8 +579,8 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
             DPU_ASSERT(dpu_prepare_xfer(dpu, &hg->bitmap[0][0]));
         }
         DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "bitmap", 0, ALIGN8(size_bitmap_bytes), DPU_XFER_DEFAULT));
-
     }
+#endif
 
     DPU_FOREACH(set, dpu, each_dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &hg->e_cnt));
@@ -446,5 +594,10 @@ void data_transfer(struct dpu_set_t set, Hypergraph *hg)
 
     printf("Data transfer complete: e_cnt=%u e2v_size=%u max_root_num=%u\n",
            (unsigned)hg->e_cnt, (unsigned)hg->e2v_size, (unsigned)max_root_num);
+
+    end = clock(); 
+
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC; 
+    printf("Time used: %f seconds\n", cpu_time_used);
     }
 }
