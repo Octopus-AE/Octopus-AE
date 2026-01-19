@@ -55,6 +55,22 @@ GRAPH=SB PATTERN=HYP2_3_4_6 make test
 > 💡 The available values for `GRAPH` and `PATTERN` are defined in `include/common.h`.  
 > To add new hypergraphs or patterns, modify `common.h` and recompile.
 
+## ⚡ Optimization Options
+
+Octopus provides an optional optimization that uses the number of overlapping vertices between hyperedges as a pruning strategy. This optimization can be enabled or disabled through the `H2H` macro definition in `include/common.h` (line 86).
+
+- **Default state**: The `H2H` macro is commented out (disabled by default)
+- **To enable**: Uncomment line 86 in `include/common.h`:
+  ```c
+  #define H2H
+  ```
+- **To disable**: Comment out or remove the `H2H` definition:
+  ```c
+  //#define H2H
+  ```
+
+After modifying `common.h`, recompile the project for the changes to take effect.
+
 ## 📥 Download Hypergraph Data
 
 ```bash
